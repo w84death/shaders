@@ -2,6 +2,10 @@
  * SHADER BY KRZYSZTOF KRYSTIAN JANKOWSKI
  * (c)2023.04 P1X
  *
+ * Introducing the Demoscene Tool for Fullscreen Shader Demos,
+ * a cutting-edge WebGL (GLSL) powered application crafted by
+ * the collaborative efforts of ChatGPT 4 and KKJ from the P1X group.
+ *
  * */
 
 precision mediump float;
@@ -11,6 +15,7 @@ uniform vec2 u_resolution;
 
 /*
  * SDF BRUSHES
+ * https://iquilezles.org/articles/distfunctions/
  *
  * */
 float sdSphere( vec3 p, float s ){return length(p)-s;}
