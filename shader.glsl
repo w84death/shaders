@@ -1,17 +1,23 @@
 /*
  * SHADER BY KRZYSZTOF KRYSTIAN JANKOWSKI
- * (c)2023.04 P1X
+ * MUSIC BY TimTaj (This Uplifting House)
  *
  * Introducing the Demoscene Tool for Fullscreen Shader Demos,
  * a cutting-edge WebGL (GLSL) powered application crafted by
  * the collaborative efforts of ChatGPT 4 and KKJ from the P1X group.
  *
+ * *** WORK IN PROGRESS ***
+ * This shader will change over time as I develop it.
+ * Also there will be a huge refactor once I got everything right.
+ *
+ * (c)2023.04 P1X
  * */
 
 precision mediump float;
 varying vec2 v_uv;
 uniform float u_time;
 uniform vec2 u_resolution;
+uniform float u_fft;
 
 /*
  * SDF BRUSHES
@@ -61,7 +67,7 @@ float opSmoothIntersection( float d1, float d2, float k ) {
 float map(in vec3 pos){
     float ground = pos.y + 0.1;
 
-    pos -= vec3(.0,-0.8+sin(-1.5+u_time*.5)*1.4,.0);
+    pos -= vec3(.0,-0.8+sin(-1.5+u_time*.5)*1.4,.0+u_fft);
 
 
     float p1 = sdBox(pos-vec3(-0.7,0.95,.0),vec3(0.05,0.95,0.05));
@@ -87,6 +93,19 @@ float map(in vec3 pos){
 
     float scene=opUnion(p_,opUnion(i_,x_));
     return opSmoothUnion(ground,scene,0.1);
+}
+
+vec3 getMaterial(vec3 p, float id){
+    vec3 m;
+    if(int(id)==1){
+            m=vec3(1.0,0.0,0.0);
+    }else
+    if(int(id)==2){
+            m=vec3(0.0,1.0,0.0);
+    }else{
+            m=vec3(0.5);
+    }
+    return m;
 }
 
 /*
