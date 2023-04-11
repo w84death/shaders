@@ -26,6 +26,9 @@ const float MAT_ASPHALT = 4.0;
 const float MAT_CONCRETE = 5.0;
 const float MAT_CHESS = 6.0;
 
+const float T_SUNRISE=6.0;
+
+
 /*
  * SDF BRUSHES
  * https://iquilezles.org/articles/distfunctions/
@@ -84,13 +87,12 @@ float rand(vec2 pos){
  * */
 vec2 sdfWorld(in vec3 pos){
     float m = MAT_GROUND;
-    float ground = pos.y + 0.1;
+    float ground = pos.y+0.1;
 
-    float b1 = sdBox(pos-vec3(map(u_time,18.0,35.0,-3.0,-4.0),u_fft,map(u_time,18.0,35.0,-.5,1.0)),vec3(2.0,0.1+u_fft*2.0,0.05));
-    float b2 = sdBox(pos-vec3(-1.0,u_fft*2.0,map(u_time,18.0,35.0,-1.0,-2.0)),vec3(2.0,0.1+u_fft*4.0,0.05));
-    float b3 = sdBox(pos-vec3(1.0,u_fft*2.0,map(u_time,18.0,35.0,-1.0,-2.0)),vec3(2.0,0.1+u_fft*4.0,0.05));
-    float b4 = sdBox(pos-vec3(map(u_time,18.0,35.0,3.0,4.0),u_fft,map(u_time,18.0,35.0,-.5,1.0)),vec3(2.0,0.1+u_fft*2.0,0.05));
-    float b_ = opUnion(b1,opUnion(b2,opUnion(b3,b4)));
+    vec3 qb = vec3(mod(abs(pos.x),20.0)-10.0,
+                   pos.y,
+                   mod(abs(pos.z),10.0)-5.0);
+    float b_ = sdBox(qb,vec3(6.0,2.0,3.0));
 
     if (b_<0.001) m=MAT_CITY;
 
@@ -119,7 +121,10 @@ vec2 sdfWorld(in vec3 pos){
 
     float p1x_=opUnion(p_,opUnion(i_,x_));
     if (p1x_<0.001) m=MAT_DARKBLUE;
-    return vec2(opSmoothUnion(ground,opUnion(p1x_,b_),0.1),m);
+
+    float world=opUnion(ground,opUnion(b_,p1x_));
+
+    return vec2(world,m);
 }
 
 /*
@@ -141,7 +146,7 @@ vec3 calcNormal(in vec3 pos){
 vec2 castRay(in vec3 ro, vec3 rd){
     vec2 res=vec2(-1.0,-1.0);
     float clipNear = 0.5;
-    float clipFar = 20.0;
+    float clipFar = 40.0;
     float t = clipNear;
     for (int i=0; i<512; i++){
         vec2 scene = sdfWorld(ro+rd*t);
@@ -156,6 +161,39 @@ vec2 castRay(in vec3 ro, vec3 rd){
 }
 
 /*
+ * SHOFT SHADOW
+ *
+ * */
+float castSoftShadow(in vec3 ro, vec3 rd){
+    float res=1.0;
+    float dist=0.01;
+    float size=0.03;
+    for (int i=0; i<512; i++){
+        float hit = sdfWorld(ro+rd*dist).x;
+        res = min(res,hit/(dist*size));
+        dist+=hit;
+        if(hit<0.001 || hit>60.0) break;
+    }
+    return clamp(res,0.0,1.0);
+}
+
+/*
+ * AO
+ *
+ * */
+float getAO(in vec3 ro, vec3 normal){
+    float occ=0.0;
+    float weight=1.0;
+    for (int i=0; i<8; i++){
+        float len = 0.01+0.02*float(i*i);
+        float dist = sdfWorld(ro+normal*len).x;
+        occ=(len-dist)*weight;
+        weight*=.85;
+    }
+    return 1.0-clamp(.6*occ,0.0,1.0);
+}
+
+/*
  * MATERIALS GENERATION
  *
  * */
@@ -163,8 +201,9 @@ vec3 getMaterial(vec3 p, float id){
     vec3 m=vec3(.0,.0,.0);
 
     if(id==MAT_GROUND){
-        m=vec3(.1,1.0,.1);
-        m*=vec3(0.1)+vec3(mod(floor(p.x*8.0)+floor(p.z*8.0),2.0));
+        m=vec3(.0,1.0,.0);
+        m*=vec3(mod(floor(.5+p.x*.25)*floor(.5+p.z*.5),5.0));
+
     }else
     if(id==MAT_DARKBLUE){
         m=vec3(0.1,.2,5.0);
@@ -175,8 +214,37 @@ vec3 getMaterial(vec3 p, float id){
     }else
     if(id==MAT_CHESS){
     vec3(mod(floor(p.x*8.0)+floor(p.z*8.0),2.0));
+    }else
+    if(id==MAT_ASPHALT){
+        m=vec3(.01,.01,.02);
     }
     return m;
+}
+
+
+vec3 getColor(vec3 pos, vec3 nor, float material_id){
+    // colors reducer for better color correction
+    vec3 mate = vec3(0.2);
+
+        // environment: sun, shadows, fake bounce light
+        vec3 sun_pos = normalize(vec3(-6.0,map(u_time,T_SUNRISE*.25,T_SUNRISE,-3.0,3.0),3.0));
+        float sun_shadow = castSoftShadow(pos+nor*0.001, sun_pos);
+        float ao = getAO(pos,nor);
+
+        float sun_dif = clamp(dot(nor,sun_pos),0.0,1.0);
+        float sky_dif = clamp(0.5 + 0.5*dot(nor,vec3(0.0,1.0,0.0)),0.0,1.0);
+        float bou_dif = clamp(0.5 + 0.5*dot(nor,vec3(0.0,-1.0,0.0)),0.0,1.0);
+
+        // material + environment
+        vec3 col = mate*getMaterial(pos,material_id);
+        col *= ao;
+        col += mate*vec3(5.0,3.0,2.0)*sun_dif*sun_shadow*ao;
+        col += mate*vec3(0.5,0.8,0.9)*sky_dif;
+        col += mate*vec3(0.7,0.3,0.2)*bou_dif;
+
+        col *= map(u_time,T_SUNRISE*.25,T_SUNRISE,.01,1.0);
+
+        return col;
 }
 
 /*
@@ -184,13 +252,12 @@ vec3 getMaterial(vec3 p, float id){
  *
  * */
 vec3 render(in vec2 p){
-    float tsunrise=6.0;
 
     // ray origin aka camera
-    vec3 ro = vec3(.0,.0,1.5-sin(u_time*.5)*.5);
+    vec3 ro = vec3(.0,map(u_time,T_SUNRISE,T_SUNRISE*2.0,0.0,10.0),1.5-sin(u_time*.5)*.5);
 
     // target aka look at
-    vec3 ta = vec3(.0,map(u_time,0.0,tsunrise,.5+sin(u_time*.5)*.3,1.0),.0);
+    vec3 ta = vec3(.0,map(u_time,0.0,T_SUNRISE,.5+sin(u_time*.5)*.3,1.0),.0);
 
     vec3 ww = normalize (ta-ro);
     vec3 uu = normalize( cross(ww, vec3(0,1,0)));
@@ -200,12 +267,9 @@ vec3 render(in vec2 p){
     vec3 rd = normalize(p.x*uu+p.y*vv+1.5*ww);
 
     // sky simulation
-    vec3 col = vec3(map(u_time,tsunrise*.5,tsunrise,1.0,.0),0.75,1.0) - 0.5*rd.y;
+    vec3 col = vec3(map(u_time,T_SUNRISE*.5,T_SUNRISE,1.0,.0),0.75,1.0) - 0.5*rd.y;
     col =  mix(col, vec3(0.7,0.8,0.8), exp(-10.0*rd.y));
-    col *= map(u_time,tsunrise*.25,tsunrise,.0,1.0);
-
-    // colors reducer for better color correction
-    vec3 mate = vec3(0.2);
+    col *= map(u_time,T_SUNRISE*.25,T_SUNRISE,.0,1.0);
 
     // hit ray trace
     vec2 ray = castRay(ro,rd);
@@ -215,20 +279,8 @@ vec3 render(in vec2 p){
     if (ray_hit>0.0){
         vec3 pos = ro+rd*ray_hit;
         vec3 nor = calcNormal(pos);
+        col = getColor(pos,nor,material_id);
 
-        // environment: sun, shadows, fake bounce light
-        vec3 sun_dir = normalize(vec3(-6.0,map(u_time,tsunrise*.25,tsunrise,-3.0,3.0),3.0));
-        float sun_shadow = step(castRay(pos+nor*0.001, sun_dir).x, 0.0);
-        float sun_dif = clamp(dot(nor,sun_dir),0.0,1.0);
-        float sky_dif = clamp(0.5 + 0.5*dot(nor,vec3(0.0,1.0,0.0)),0.0,1.0);
-        float bou_dif = clamp(0.5 + 0.5*dot(nor,vec3(0.0,-1.0,0.0)),0.0,1.0);
-
-        // material + environment
-        col  = mate*getMaterial(pos,material_id);
-        col += mate*vec3(5.0,3.0,2.0)*sun_dif*sun_shadow;
-        col += mate*vec3(0.5,0.8,0.9)*sky_dif;
-        col += mate*vec3(0.7,0.3,0.2)*bou_dif;
-        col *= map(u_time,tsunrise*.25,tsunrise,.01,1.0);
     }
     return col;
 }
