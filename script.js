@@ -12,8 +12,8 @@ async function main() {
   }
 
   function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = window.innerWidth*.5;
+    canvas.height = window.innerHeight*.5;
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
