@@ -7,9 +7,30 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <canvas id="glCanvas"></canvas>
-  <pre id="shaderPanel"></pre>
-  <div id="audioControls">
+  <div id="landingPage">
+    <h1>Fullscreen Shader Demo</h1>
+    <p>
+      A shader is a small program that runs on the GPU (Graphics Processing Unit) to calculate the colors,
+      positions, and other properties of individual pixels in a rendered image. In the context of computer graphics,
+      shaders are commonly used for various purposes such as visual effects, image processing, and rendering 3D scenes.
+    </p>
+    <select id="resolutionSelect">
+    <option value="1">Full Resolution</option>
+    <option value="0.5" selected>Half Resolution</option>
+    <option value="0.25">Quarter Resolution</option>
+  </select>
+  <p>
+  <label for="fullscreenCheckbox">Fullscreen?</label>
+<input type="checkbox" id="fullscreenCheckbox">
+</p>
+    <button id="startButton">Start Demo</button>
+  </div>
+  <canvas id="glCanvas" hidden></canvas>
+  <div id="fps" hidden>
+  <span id="fpsCounter">0</span> FPS / <span id="frameTime">0.00</span> ms
+</div>
+  <pre id="shaderPanel" hidden></pre>
+  <div id="audioControls" hidden>
     <button id="playStopBtn">Play</button>
     <input id="seekBar" type="range" min="0" max="1" step="0.01" value="0">
     <span id="currentTime">0.00</span>
